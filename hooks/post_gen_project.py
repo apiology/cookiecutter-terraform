@@ -44,11 +44,12 @@ if __name__ == '__main__':
             description = "{{ cookiecutter.project_short_description.replace('\"', '\\\"') }}"
             subprocess.check_call(['gh', 'repo', 'create',
                                    visibility_flag,
-                                   '-y',
                                    '--description',
                                    description,
+                                   '--source',
+                                   '.',
                                    '{{ cookiecutter.github_username }}/'
                                    '{{ cookiecutter.project_slug }}'])
-            subprocess.check_call(['circleci', 'follow'])
             subprocess.check_call(['git', 'push'])
+            subprocess.check_call(['circleci', 'follow'])
             subprocess.check_call(['git', 'branch', '--set-upstream-to=origin/main', 'main'])
