@@ -79,7 +79,8 @@ latest_ruby_version() {
   #
   # https://github.com/rbenv/rbenv/issues/1441
   set +e
-  rbenv install --list 2>/dev/null | cat | grep "^${major_minor}."
+  # ruby-build 202605+ dropped EOL Rubies from `--list`; use `--list-all`.
+  rbenv install --list-all 2>/dev/null | grep "^${major_minor}\\." | grep -v -- -preview | grep -v -- -rc | grep -v -- -dev | tail -1
   set -e
 }
 
@@ -105,7 +106,7 @@ ensure_ruby_build_requirements() {
 ensure_latest_ruby_build_definitions() {
   ensure_rbenv
 
-  git -C "$(rbenv root)"/plugins/ruby-build pull
+  git -C "$(rbenv root)"/plugins/ruby-build pull --force
 }
 
 # You can find out which feature versions are still supported / have
@@ -115,7 +116,7 @@ ensure_ruby_versions() {
 
   # You can find out which feature versions are still supported / have
   # been release here: https://www.ruby-lang.org/en/downloads/
-  ruby_versions="$(latest_ruby_version 3.1)"
+  ruby_versions="$(latest_ruby_version 3.3)"
 
   echo "Latest Ruby versions: ${ruby_versions}"
 
@@ -123,17 +124,7 @@ ensure_ruby_versions() {
 
   for ver in $ruby_versions
   do
-    # These CFLAGS can be retired once 2.6.7 is no longer needed :
-    #
-    # https://github.com/rbenv/ruby-build/issues/1747
-    # https://github.com/rbenv/ruby-build/issues/1489
-    # https://bugs.ruby-lang.org/issues/17777
-    if [ "${ver}" == 2.6.7 ]
-    then
-      CFLAGS="-Wno-error=implicit-function-declaration" rbenv install -s "${ver}"
-    else
-      rbenv install -s "${ver}"
-    fi
+    rbenv install -s "${ver}"
   done
 }
 
