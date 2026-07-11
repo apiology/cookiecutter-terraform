@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
+"""Package metadata for the cookiecutter-terraform cookiecutter template."""
 
 from distutils.core import setup
-
 
 setup(
     name='cookiecutter-terraform',

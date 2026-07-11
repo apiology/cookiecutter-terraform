@@ -16,25 +16,77 @@
 #
 # Uncomment the following lines to make the configuration take effect.
 
+gemfile: Gemfile
+
 PreCommit:
-  # Extend default config at https://github.com/sds/overcommit/blob/master/config/default.yml
+  # Extend default config at
+  # https://github.com/sds/overcommit/blob/master/config/default.yml
+  BrokenSymlinks:
+    enabled: true
+    exclude:
+      # used for development
+      - 'config/env.1p'
+      - 'config/env.local'
+  FixMe:
+    enabled: true
+    exclude:
+      # sorbet sure likes to crash
+      - 'core.*'
+      # don't freak out over line below
+      - '.overcommit.yml'
+    keywords: ['BROKEN', 'BUG', 'FIXME', 'HACK', 'OPTIMIZE', 'REVIEW', 'TODO', 'WTF', 'XXX']
   PythonFlake8:
     enabled: true
-    on_warn: fail
   ShellCheck:
     enabled: true
-    on_warn: fail
     include:
       - '.envrc'
       - '**/*.sh'
   YamlLint:
     enabled: true
-    on_warn: fail
+    flags: ['-c', '.yamllint.yml', '--format=parsable', '--strict']
   CircleCi:
     required_executable: 'circleci'
     flags: ['config', 'validate']
     include:
       - '.circleci/config.yml'
+    enabled: true
+  Punchlist:
+    command: ['bundle', 'exec', 'punchlist']
+    enabled: true
+    exclude:
+      # used for development
+      - 'config/env.1p'
+      - 'config/env.local'
+      # sorbet sure likes to crash
+      - 'core.*'
+      # don't freak out over line below
+      - '.overcommit.yml'
+  CustomScript:
+    enabled: true
+    requires_files: false
+    required_executable: 'bin/git-commit-validate'
+  BundleInstall:
+    enabled: true
+  ALL:
+    on_warn: fail
+    problem_on_unmodified_line: warn
+    quiet: false
+
+PostCheckout:
+  BundleInstall:
+    enabled: true
+
+PostCommit:
+  BundleInstall:
+    enabled: true
+
+PostMerge:
+  BundleInstall:
+    enabled: true
+
+PostRewrite:
+  BundleInstall:
     enabled: true
 
 #PostCheckout:
