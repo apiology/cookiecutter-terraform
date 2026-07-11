@@ -1,7 +1,6 @@
-.PHONY: clean test help typecheck quality
-.DEFAULT_GOAL := default
+.PHONY: build build-typecheck bundle_install cicoverage citypecheck citest citypecoverage clean clean-build clean-coverage clean-pyc clean-typecheck clean-typecoverage coverage default docs gem_dependencies help overcommit post_cookiecutter_sync quality repl test typecheck typecoverage update_from_cookiecutter
 
-BAKE_OPTIONS=--no-input
+.DEFAULT_GOAL := default
 
 define PRINT_HELP_PYSCRIPT
 import re, sys
@@ -14,17 +13,78 @@ for line in sys.stdin:
 endef
 export PRINT_HELP_PYSCRIPT
 
-default: clean-coverage test coverage clean-typecoverage typecheck typecoverage quality ## run default typechecking, tests and quality
+help:
+	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
-typecheck: ## validate types in code and configuration
+default: clean-typecoverage build typecheck typecoverage clean-coverage test coverage overcommit_branch quality ## run default typechecking, tests and quality
+
+SOURCE_FILE_GLOBS = ['{tests,hooks}/**/*.py']
+
+SOURCE_FILES := $(shell ruby -e "puts Dir.glob($(SOURCE_FILE_GLOBS))")
+
+start: ## run code continously and watch files for changes
+	echo "Teach me how to 'make start'"
+	exit 1
+
+build: bundle_install pip_install build-typecheck ## Update 3rd party packages as well and produce any artifacts needed from code
+
+types.installed: Gemfile.lock Gemfile.lock.installed ## Ensure typechecking dependencies are in place
+	touch types.installed
+
+build-typecheck: types.installed  ## Fetch information that type checking depends on
+
+docs: ## Generate documentation
+
+clean-typecheck: ## Refresh the easily-regenerated information that type checking depends on
+	rm -fr .mypy_cache
+	rm -f types.installed
+	echo all clear
+
+realclean-typecheck: clean-typecheck ## Remove all type checking artifacts
+
+realclean: clean realclean-typecheck
+	rm -fr vendor/bundle .bundle/config
+	rm -f .make/*
+	rm -f *.installed
+
+# https://app.circleci.com/pipelines/github/apiology/cookiecutter-pypackage/281/workflows/b85985a9-16d0-42c4-93d4-f965a111e090/jobs/366
+typecheck: build-typecheck ## run mypy against project
+	mypy --cobertura-xml-report typecover --html-report typecover hooks tests
 
 citypecheck: typecheck ## Run type check from CircleCI
 
-typecoverage: typecheck ## Run type checking and then ratchet coverage in metrics/
+typecoverage: typecheck ## Run type checking and then ratchet coverage in metrics/mypy_high_water_mark
 
-clean-typecoverage: ## Clean out type-related coverage previous results to avoid flaky results
+clean-typecoverage: ## Clean out mypy previous results to avoid flaky results
 
-citypecoverage: typecoverage ## Run type checking, ratchet coverage, and then complain if ratchet needs to be committed
+ratchet-typecoverage: ## Run type checking, ratchet coverage, and then complain if ratchet needs to be committed
+	@echo "Looking for un-checked-in type coverage metrics..."
+	@git status --porcelain metrics/mypy_high_water_mark
+	@test -z "$$(git status --porcelain metrics/mypy_high_water_mark)"
+
+citypecoverage: citypecheck ratchet-typecoverage ## Run type checking, ratchet coverage, and then complain if ratchet needs to be committed
+
+clean-build: ## remove build artifacts
+	rm -fr build/
+	rm -fr dist/
+	rm -fr .eggs/
+	find . -name '*.egg-info' -exec rm -fr {} +
+	find . -name '*.egg' -exec rm -f {} +
+
+clean-pyc: ## remove Python file artifacts
+	find . -name '*.pyc' -exec rm -f {} +
+	find . -name '*.pyo' -exec rm -f {} +
+	find . -name '*~' -exec rm -f {} +
+	find . -name '__pycache__' -exec rm -fr {} +
+
+clean-test: ## remove test and coverage artifacts
+	rm -fr .tox/
+	rm -f .coverage
+	rm -fr htmlcov/
+	rm -fr .pytest_cache
+
+config/env: config/env.1p  ## Create file suitable for docker-compose usage
+	cat config/env.1p | cut -d= -f1 > config/env
 
 requirements_dev.txt.installed: requirements_dev.txt
 	pip install -q --disable-pip-version-check -r requirements_dev.txt
@@ -32,31 +92,51 @@ requirements_dev.txt.installed: requirements_dev.txt
 
 pip_install: requirements_dev.txt.installed ## Install Python dependencies
 
-# bundle install doesn't get run here so that we can catch it below in
-# fresh-checkout and fresh-rbenv cases
-Gemfile.lock: Gemfile
+Gemfile.lock: Gemfile .bundle/config
+	if [ ! -f Gemfile.lock ]; then \
+	  bundle install; \
+	else \
+	  bundle lock; \
+	fi
 
-# Ensure any Gemfile.lock changes ensure a bundle is installed.
-Gemfile.lock.installed: Gemfile.lock
-	bundle install
+.bundle/config:
+	touch .bundle/config
+
+gem_dependencies: .bundle/config
+
+# Ensure any Gemfile.lock changes, even pulled from git, ensure a
+# bundle is installed.
+Gemfile.lock.installed: Gemfile vendor/.keep
 	touch Gemfile.lock.installed
+
+vendor/.keep: Gemfile.lock .ruby-version
+	make gem_dependencies
+	bundle install
+	touch vendor/.keep
 
 bundle_install: Gemfile.lock.installed ## Install Ruby dependencies
 
-clean: ## remove all built artifacts
+lint: ## check style with flake8
+	flake8 hooks tests
+
+test-all: ## run tests on every Python version with tox
+	tox
+
+clean: clean-build clean-pyc clean-test clean-typecoverage clean-typecheck clean-coverage ## remove all build, test, coverage and Python artifacts
 
 test: ## run tests quickly
-	pytest
+	pytest --maxfail=1 tests/test_bake_project.py --capture=no --keep-baked-projects -v
 
-citest: test ## Run unit tests from CircleCI
+citest: ## Run unit tests from CircleCI
+	pytest --keep-baked-projects  --maxfail=1 tests/test_bake_project.py --capture=no -v
 
 overcommit: ## run precommit quality checks
-	bundle exec overcommit --run
+	bin/overcommit --run
 
-quality: overcommit ## run precommit quality checks
+overcommit_branch: ## run precommit quality checks only on changed files
+	bin/overcommit --run --diff origin/main
 
-help:
-	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
+quality: lint overcommit ## run precommit quality checks
 
 bake: ## generate project using defaults
 	cookiecutter $(BAKE_OPTIONS) . --overwrite-if-exists
@@ -68,15 +148,20 @@ replay: BAKE_OPTIONS=--replay ## replay last cookiecutter run and watch for chan
 replay: watch
 	;
 
+repl: ## Launch an interactive development shell
+	python
+
 clean-coverage: ## Clean out previous output of test coverage to avoid flaky results from previous runs
 
-coverage: test report-coverage ## check code coverage
+coverage: test ## check code coverage
 
-report-coverage: test ## Report summary of coverage to stdout, and generate HTML, XML coverage report
+update_apt: .make/apt_updated
 
-report-coverage-to-codecov: report-coverage ## use codecov.io for PR-scoped code coverage reports
+.make/apt_updated:
+	sudo DEBIAN_FRONTEND=noninteractive apt-get update -y
+	touch .make/apt_updated
 
-cicoverage: report-coverage-to-codecov ## check code coverage, then report to codecov
+cicoverage: citest ## check code coverage
 
 update_from_cookiecutter: ## Bring in changes from template project used to create this repo
 	bin/cookiecutter_project_upgrader.sh
@@ -84,4 +169,3 @@ update_from_cookiecutter: ## Bring in changes from template project used to crea
 
 post_cookiecutter_sync: ## Ecosystem-specific steps after template sync (empty by default)
 	@:
-

@@ -1,4 +1,7 @@
 {
+    "_checkout": "main",
+    "_output_dir": "/Users/broz/.cursor/worktrees/cookiecutter-terraform/cascade-cookiecutter-terraform-1783739815896/.git/cookiecutter",
+    "_repo_dir": "/Users/broz/.cookiecutters/cookiecutter-cookiecutter",
     "_template": "https://github.com/apiology/cookiecutter-cookiecutter",
     "email": "vince@broz.cc",
     "full_name": "Vince Broz",
