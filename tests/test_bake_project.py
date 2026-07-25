@@ -38,6 +38,57 @@ def suppressed_github_and_circleci_creation():
         del os.environ['SKIP_EXTERNAL']
 
 
+PARENT_HOOK_ENV_VARS = (
+    'GIT_DIR',
+    'GIT_WORK_TREE',
+    'GIT_INDEX_FILE',
+    'BUNDLE_GEMFILE',
+    'BUNDLE_PATH',
+    'BUNDLE_BIN',
+    'BUNDLE_WITHOUT',
+    'BUNDLE_DEPLOYMENT',
+    'BUNDLE_APP_CONFIG',
+    'RUBYOPT',
+)
+
+
+def _parent_hook_env_var(var):
+    return any((
+        var in PARENT_HOOK_ENV_VARS,
+        var.startswith('BUNDLER_ORIG_'),
+        var.startswith('BUNDLE_'),
+        var.startswith('BUNDLER_'),
+        var in ('GEM_HOME', 'GEM_PATH'),
+    ))
+
+
+def _env_without_git_push_vars():
+    """Drop git push/pre-push env so baked-project make targets use local .git."""
+    env = os.environ.copy()
+    for var in list(env):
+        if _parent_hook_env_var(var):
+            env.pop(var, None)
+    if 'PATH' in env:
+        env['PATH'] = os.pathsep.join(
+            part for part in env['PATH'].split(os.pathsep)
+            if part and '/bundle/ruby/' not in part
+        )
+    return env
+
+
+@contextmanager
+def without_parent_hook_env():
+    """Clear git-hook env so cookiecutter post_gen git ops use a fresh repo."""
+    saved = {}
+    for var in list(os.environ):
+        if _parent_hook_env_var(var):
+            saved[var] = os.environ.pop(var)
+    try:
+        yield
+    finally:
+        os.environ.update(saved)
+
+
 def errmsg(exception):
     """Format a cookiecutter or Jinja exception for assertion messages."""
     if isinstance(exception, jinja2.exceptions.TemplateSyntaxError):
@@ -53,7 +104,7 @@ def bake_in_temp_dir(cookies, *args, **kwargs):
     :param args: Positional arguments passed to cookies.bake.
     :param kwargs: Keyword arguments passed to cookies.bake.
     """
-    with suppressed_github_and_circleci_creation():
+    with suppressed_github_and_circleci_creation(), without_parent_hook_env():
         result = cookies.bake(*args, **kwargs)
         assert result is not None, result
         assert result.exception is None, errmsg(result.exception)
@@ -73,7 +124,10 @@ def run_inside_dir(command, dirpath):
     :param dirpath: Working directory for the command.
     """
     with inside_dir(dirpath):
-        return subprocess.check_call(shlex.split(command))
+        return subprocess.check_call(
+            shlex.split(command),
+            env=_env_without_git_push_vars(),
+        )
 
 
 def check_output_inside_dir(command, dirpath):
@@ -83,7 +137,10 @@ def check_output_inside_dir(command, dirpath):
     :param dirpath: Working directory for the command.
     """
     with inside_dir(dirpath):
-        return subprocess.check_output(shlex.split(command))
+        return subprocess.check_output(
+            shlex.split(command),
+            env=_env_without_git_push_vars(),
+        )
 
 
 def project_info(result):
