@@ -428,7 +428,8 @@ ensure_pip_and_wheel() {
 ensure_python_requirements() {
   # Stale CI pyenv caches can restore requirements_dev.txt.installed while the
   # active virtualenv lacks packages (e.g. after python_versions / venv rename).
-  if ! type mypy >/dev/null 2>&1
+  # Use import, not `type mypy` — pyenv shims exist for other versions.
+  if ! python -c 'import mypy' >/dev/null 2>&1
   then
     rm -f requirements_dev.txt.installed
   fi

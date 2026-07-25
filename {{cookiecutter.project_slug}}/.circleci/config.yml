@@ -54,9 +54,8 @@ commands:
       - restore_cache:
           name: Restore pyenv cache
           keys:
-            - pyenv-v3-{% raw %}{{ checksum "requirements_dev.txt" }}{% endraw %}-
-            - pyenv-v3-
-            - pyenv-
+            - pyenv-cache-v1-{% raw %}{{ checksum "requirements_dev.txt" }}{% endraw %}-
+            - pyenv-cache-v1-
       - run:
           name: Initialize packages
           no_output_timeout: 30m
@@ -74,7 +73,7 @@ commands:
           path: /tmp/fix_sh_timing.log
       - save_cache:
           name: 'Save pyenv cache'
-          key: pyenv-v3-{% raw %}{{ checksum "requirements_dev.txt" }}{% endraw %}-{% raw %}{{ checksum ".python-version" }}{% endraw %}
+          key: pyenv-cache-v1-{% raw %}{{ checksum "requirements_dev.txt" }}{% endraw %}-{% raw %}{{ checksum ".python-version" }}{% endraw %}
           paths:
             - "requirements_dev.txt.installed"
             - "/home/circleci/.cache/pip/wheels"
