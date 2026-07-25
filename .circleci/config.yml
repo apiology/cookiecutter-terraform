@@ -54,9 +54,8 @@ commands:
       - restore_cache:
           name: Restore pyenv cache
           keys:
-            - pyenv-v2-{{ checksum "requirements_dev.txt" }}-
-            - pyenv-v2-
-            - pyenv-
+            - pyenv-cache-v1-{{ checksum "requirements_dev.txt" }}-
+            - pyenv-cache-v1-
       - run:
           name: Initialize packages
           no_output_timeout: 30m
@@ -74,7 +73,7 @@ commands:
           path: /tmp/fix_sh_timing.log
       - save_cache:
           name: 'Save pyenv cache'
-          key: pyenv-v2-{{ checksum "requirements_dev.txt" }}-{{ checksum ".python-version" }} # yamllint disable-line rule:line-length
+          key: pyenv-cache-v1-{{ checksum "requirements_dev.txt" }}-{{ checksum ".python-version" }} # yamllint disable-line rule:line-length
           paths:
             - "requirements_dev.txt.installed"
             - "/home/circleci/.cache/pip/wheels"
