@@ -182,4 +182,15 @@ def test_bake_and_run_build(cookies):
         license_file_path = result.project_path / 'LICENSE'
         now = datetime.datetime.now()
         assert str(now.year) in license_file_path.open().read()
+
+
+def test_bake_not_open_source(cookies):
+    """post_gen_project.py removes LICENSE and CONTRIBUTING.rst for closed-source projects."""
+    with bake_in_temp_dir(cookies,
+                          extra_context={
+                              'open_source_license': 'Not open source',
+                          }) as result:
+        found_toplevel_files = [f.name for f in result.project_path.iterdir()]
+        assert 'LICENSE' not in found_toplevel_files
+        assert 'CONTRIBUTING.rst' not in found_toplevel_files
         print('test_bake_and_run_build path', str(result.project_path))
